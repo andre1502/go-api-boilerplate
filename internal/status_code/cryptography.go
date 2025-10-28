@@ -1,0 +1,18 @@
+package status_code
+
+const (
+	NEW_CIPHER_ERROR_CODE    = 7000
+	NEW_CIPHER_ERROR_MESSAGE = "Error when init new cipher"
+
+	INVALID_PADDING_BLOCK_SIZE_ERROR_CODE    = 7001
+	INVALID_PADDING_BLOCK_SIZE_ERROR_MESSAGE = "Invalid padding block size"
+
+	DECRYPTION_ERROR_CODE    = 7002
+	DECRYPTION_ERROR_MESSAGE = "Error when decrypt text"
+
+	HASH_PASSWORD_ERROR_CODE    = 7003
+	HASH_PASSWORD_ERROR_MESSAGE = "Error when hash password"
+
+	CRYPTOGRAPHY_ERROR_CODE    = 7999
+	CRYPTOGRAPHY_ERROR_MESSAGE = "Cryptography error"
+)

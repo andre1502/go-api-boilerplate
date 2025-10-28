@@ -1,0 +1,57 @@
+name: Deploy to GCE for DEV
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["Deploy Docker Image to GCE"]
+    types:
+      - completed
+
+env:
+  INSTANCE_NAME: go-api-dev-001
+  INSTANCE_REGION: asia-east1-b
+  IMAGE_NAME: ${{ github.repository }}
+  TAG_NAME: latest
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate with Google Cloud
+        uses: "google-github-actions/auth@v1"
+        with:
+          credentials_json: "${{ secrets.GAR_SERVICE_ACCOUNT_KEY }}"
+
+      - name: Set up Cloud SDK
+        uses: "google-github-actions/setup-gcloud@v1"
+
+      - name: Deploy and Restart Services
+        run: |
+          echo "🔗 連線至 GCP VM 並執行部署..."
+          gcloud compute ssh --zone=${{ env.INSTANCE_REGION }} ${{ env.INSTANCE_NAME }} --command '
+            set -e
+
+            echo "🚀 進入部署目錄"
+            cd /data/go-api || { echo "❌ 目錄不存在"; exit 1; }
+
+            echo "📂 確認 docker-compose.yml 是否存在"
+            if [ ! -f docker-compose.yml ]; then
+              echo "❌ docker-compose.yml 未找到，部署中止"
+              exit 1
+            fi
+
+            echo "📁 當前工作目錄為：$(pwd)"
+
+            echo "🚀 執行 start_specific.sh..."
+            bash ./start_specific.sh 2>&1 | tee /tmp/start_specific.log
+
+            if [ "${PIPESTATUS[0]}" -ne 0 ]; then
+              echo "❌ 部署腳本執行失敗"
+              exit 1
+            fi
+
+            echo "✅ 指定服務部署完成！"
+          '

@@ -1,0 +1,128 @@
+name: Docker Image CI for STG
+
+on:
+  push:
+    tags:
+      - "*rc*"
+      - "*devops*"
+
+env:
+  PROJECT_ID: go-api
+  REPO_NAME_SCHEDULER: go-scheduler
+  REGION: asia-east1
+  GAR_LOCATION: asia-east1-docker.pkg.dev/go-api/stg/
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment: STG
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      actions: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - id: "auth"
+        uses: "google-github-actions/auth@v1"
+        with:
+          credentials_json: "${{ secrets.GAR_SERVICE_ACCOUNT_KEY }}"
+
+      - name: "Set up Cloud SDK"
+        uses: "google-github-actions/setup-gcloud@v1"
+
+      - name: "Use gcloud CLI"
+        run: "gcloud info"
+
+      - name: "Docker auth"
+        run: |-
+          gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Extract build parameters
+        run: |
+          REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2 | tr '[:upper:]' '[:lower:]')
+          echo "REPO_NAME=$REPO_NAME" >> $GITHUB_ENV
+          echo "REPO_NAME is $REPO_NAME"
+          TAG_NAME="${GITHUB_REF#refs/tags/}"
+          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
+          echo "TAG_NAME is $TAG_NAME"
+          BRANCH_NAME="stg"
+          echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
+          echo "BRANCH_NAME is $BRANCH_NAME"
+          COMMIT_HASH=$(git rev-parse --short ${{ github.sha }})
+          echo "COMMIT_HASH=$COMMIT_HASH" >> $GITHUB_ENV
+          echo "COMMIT_HASH is $COMMIT_HASH"
+          BUILD_DATE="$(TZ=":Asia/Taipei" date '+%Y-%m-%dT%H:%M:%S%z')"
+          echo "BUILD_DATE=$BUILD_DATE" >> $GITHUB_ENV
+          echo "BUILD_DATE is $BUILD_DATE"
+          BUILD_VERSION=$(git describe --tags --always --dirty)
+          echo "BUILD_VERSION=$BUILD_VERSION" >> $GITHUB_ENV
+          echo "BUILD_VERSION is $BUILD_VERSION"
+
+      - name: Build image
+        run: |
+          docker build . --file Dockerfile \
+          --target final-api \
+          --build-arg TARGET_BUILD=api \
+          --build-arg REPO_NAME=${{ env.REPO_NAME }} \
+          --build-arg BRANCH_NAME=${{ env.BRANCH_NAME }} \
+          --build-arg COMMIT_HASH=${{ env.COMMIT_HASH }} \
+          --build-arg BUILD_DATE=${{ env.BUILD_DATE }} \
+          --build-arg BUILD_VERSION=${{ env.BUILD_VERSION }} \
+          --tag ${{ env.GAR_LOCATION }}${{ env.REPO_NAME }}:${{ env.TAG_NAME != '' && env.TAG_NAME || 'latest' }}
+
+      - name: Push image
+        run: docker push ${{ env.GAR_LOCATION }}${{ env.REPO_NAME }}:${{ env.TAG_NAME != '' && env.TAG_NAME || 'latest' }}
+
+      - name: Tag as latest and push
+        if: ${{ env.TAG_NAME != 'latest' }} # 防止重複推送
+        run: |
+          docker tag ${{ env.GAR_LOCATION }}${{ env.REPO_NAME }}:${{ env.TAG_NAME }} \
+                     ${{ env.GAR_LOCATION }}${{ env.REPO_NAME }}:latest
+          docker push ${{ env.GAR_LOCATION }}${{ env.REPO_NAME }}:latest
+
+      - name: Build scheduler image
+        run: |
+          docker build . --file Dockerfile \
+          --target final-scheduler \
+          --build-arg TARGET_BUILD=scheduler \
+          --build-arg REPO_NAME=${{ env.REPO_NAME_SCHEDULER }} \
+          --build-arg BRANCH_NAME=${{ env.BRANCH_NAME }} \
+          --build-arg COMMIT_HASH=${{ env.COMMIT_HASH }} \
+          --build-arg BUILD_DATE=${{ env.BUILD_DATE }} \
+          --build-arg BUILD_VERSION=${{ env.BUILD_VERSION }} \
+          --tag ${{ env.GAR_LOCATION }}${{ env.REPO_NAME_SCHEDULER }}:${{ env.TAG_NAME != '' && env.TAG_NAME || 'latest' }}
+
+      - name: Push scheduler image
+        run: docker push ${{ env.GAR_LOCATION }}${{ env.REPO_NAME_SCHEDULER }}:${{ env.TAG_NAME != '' && env.TAG_NAME || 'latest' }}
+
+      - name: Tag as scheduler latest and push
+        if: ${{ env.TAG_NAME != 'latest' }} # 防止重複推送
+        run: |
+          docker tag ${{ env.GAR_LOCATION }}${{ env.REPO_NAME_SCHEDULER }}:${{ env.TAG_NAME }} \
+                     ${{ env.GAR_LOCATION }}${{ env.REPO_NAME_SCHEDULER }}:latest
+          docker push ${{ env.GAR_LOCATION }}${{ env.REPO_NAME_SCHEDULER }}:latest
+
+      - name: Trigger Helm Chart Repository Update
+        run: |
+          PAYLOAD=$(jq -n \
+            --arg service "${{ env.REPO_NAME }}" \
+            --arg app_version "${{ env.TAG_NAME }}" \
+            --arg environment "STG" \
+            --arg ref "main" \
+            '{"ref": $ref, "inputs": {"service": $service, "app_version": $app_version, "environment": $environment}}')
+
+          echo "PAYLOAD JSON: $PAYLOAD"
+
+          curl -X POST -H "Authorization: token ${{ secrets.GH_PAT }}" \
+          -H "Accept: application/vnd.github.v3+json" \
+          --data "$PAYLOAD" \
+          https://api.github.com/repos/Hokplay/api-helm/actions/workflows/helm-chart-package.yml/dispatches
+
+          echo 'Update ${{ env.REPO_NAME }}:${{ env.TAG_NAME }} helm chart appVersion finished.'

@@ -1,0 +1,45 @@
+package status_code
+
+const (
+	EMPTY_REDIS_CONFIG_ERROR_CODE    = 2000
+	EMPTY_REDIS_CONFIG_ERROR_MESSAGE = "Empty redis config"
+
+	INVALID_REDIS_DB_ERROR_CODE    = 2001
+	INVALID_REDIS_DB_ERROR_MESSAGE = "Invalid redis db"
+
+	REDIS_CONNECTION_ERROR_CODE    = 2002
+	REDIS_CONNECTION_ERROR_MESSAGE = "Connection redis failed"
+
+	SET_NX_ERROR_CODE    = 2003
+	SET_NX_ERROR_MESSAGE = "Error when set nx cache"
+
+	SET_MNX_ERROR_CODE    = 2004
+	SET_MNX_ERROR_MESSAGE = "Error when set multiple nx cache"
+
+	SET_CACHE_ERROR_CODE    = 2005
+	SET_CACHE_ERROR_MESSAGE = "Error when set cache"
+
+	GET_CACHE_ERROR_CODE    = 2006
+	GET_CACHE_ERROR_MESSAGE = "Error when get cache"
+
+	DELETE_CACHE_EMPTY_KEYS_ERROR_CODE    = 2007
+	DELETE_CACHE_EMPTY_KEYS_ERROR_MESSAGE = "Keys required to remove cache"
+
+	DELETE_CACHE_ERROR_CODE    = 2008
+	DELETE_CACHE_ERROR_MESSAGE = "Error when remove cache"
+
+	CALLBACK_FUNCTION_ERROR_CODE = 2009
+	CALLBACK_FUNCTION_MESSAGE    = "Error when call callback function"
+
+	INCREMENT_CACHE_ERROR_CODE    = 2010
+	INCREMENT_CACHE_ERROR_MESSAGE = "Error when increment cache"
+
+	DECREMENT_CACHE_ERROR_CODE    = 2011
+	DECREMENT_CACHE_ERROR_MESSAGE = "Error when decrement cache"
+
+	CACHE_ERROR_CODE    = 2998
+	CACHE_ERROR_MESSAGE = "Cache error"
+
+	REDIS_ERROR_CODE    = 2999
+	REDIS_ERROR_MESSAGE = "Redis error"
+)

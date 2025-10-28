@@ -1,0 +1,39 @@
+.env
+# Go binary and build artifacts
+bin/
+build/
+logs/
+dist/
+*.exe
+*.out
+*.a
+*.o
+*.dll
+*.so
+*.dylib
+go.work
+
+# Go tools generated files
+vendor/
+*.test
+*.log
+
+# IDE and editor config files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Operating system generated files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temporary files and cache
+*.tmp
+*.swp
+.cache/
+.DS_Store
+
+# Docker
+docker/data

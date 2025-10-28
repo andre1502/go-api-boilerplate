@@ -1,0 +1,32 @@
+# Git
+.git
+.gitignore
+.github
+
+# Local development and build artifacts
+dev.env
+.idea/
+.vscode/
+tmp/
+vendor/
+bin/
+docker/
+logs/
+
+# Go-specific build and cache directories
+# We copy these explicitly in multi-stage builds, so no need to send them.
+# The below pattern also catches locally built binaries and temporary files.
+**/*.a
+**/*.o
+**/*.test
+
+# Logs and other temporary files
+*.log
+*.tmp
+
+# Documentation and other non-essential files
+*.md
+docker-compose.yaml
+docker-compose.yml
+air.toml
+Makefile

@@ -1,0 +1,120 @@
+name: Deploy Helm Chart to GKE
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment (STG/PRD)"
+        required: true
+        default: STG
+        type: choice
+        options:
+          - STG
+          - PRD
+      chart_version:
+        description: "Enter the Helm Chart version"
+        required: true
+        default: "1.0.0"
+        type: string
+      namespace:
+        description: "Target GKE namespace"
+        required: true
+        default: default
+        type: choice
+        options:
+          - default
+          - logging
+          - monitoring
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate with GCP
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.GAR_SERVICE_ACCOUNT_KEY }}
+
+      - name: Configure GKE Credentials
+        uses: google-github-actions/get-gke-credentials@v1
+        with:
+          cluster_name: ${{ secrets.GKE_CLUSTER }}
+          location: ${{ secrets.GKE_REGION }}
+          project_id: ${{ secrets.GCP_PROJECT }}
+
+      - name: Authenticate with GCP Artifact Registry
+        run: |
+          gcloud auth configure-docker ${{ secrets.GCP_ARTIFACT_REGISTRY_HOST }}
+
+      - name: Extract repository name
+        run: |
+          REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2 | tr '[:upper:]' '[:lower:]')
+          echo "REPO_NAME=$REPO_NAME" >> $GITHUB_ENV
+          echo "REPO_NAME is $REPO_NAME"
+
+      - name: Get Latest Helm Chart Version
+        run: |
+          LATEST_VERSION=$(helm show chart oci://${{ secrets.GCP_ARTIFACT_REGISTRY_HOST }}/${{ secrets.GCP_PROJECT }}/${{ secrets.GCP_ARTIFACT_REGISTRY_REPO }}/${{ env.REPO_NAME }} | grep '^version:' | awk '{print $2}')
+          echo "LATEST_VERSION=$LATEST_VERSION" >> $GITHUB_ENV
+          echo "Latest Chart Version: $LATEST_VERSION"
+
+      - name: Debug Helm Pull URL
+        run: |
+          echo "Full URL: oci://${{ secrets.GCP_ARTIFACT_REGISTRY_HOST }}/${{ secrets.GCP_PROJECT }}/${{ secrets.GCP_ARTIFACT_REGISTRY_REPO }}/${{ env.REPO_NAME }}"
+          echo "Version: ${{ github.event.inputs.chart_version }}"
+
+      - name: Deploy Helm chart to GKE
+        run: |
+          helm pull oci://${{ secrets.GCP_ARTIFACT_REGISTRY_HOST }}/${{ secrets.GCP_PROJECT }}/${{ secrets.GCP_ARTIFACT_REGISTRY_REPO }}/${{ env.REPO_NAME }} \
+            --version ${{ github.event.inputs.chart_version }} \
+            --untar --untardir ./chart
+          ls -la ./chart/${{ env.REPO_NAME }}
+
+          helm upgrade --install ${{ env.REPO_NAME }} ./chart/${{ env.REPO_NAME }} \
+            --version ${{ github.event.inputs.chart_version }} \
+            --namespace ${{ github.event.inputs.namespace }} \
+            --create-namespace \
+            -f ./chart/${{ env.REPO_NAME }}/values.yaml \
+            -f ./chart/${{ env.REPO_NAME }}/values-${{ github.event.inputs.environment }}.yaml
+
+      - name: Gracefully terminate current scheduler pod
+        run: |
+          NAMESPACE=${{ github.event.inputs.namespace }}
+          LABEL_SELECTOR="app.kubernetes.io/instance=go-scheduler"
+
+          CRON_POD_NAME=$(kubectl get pod -n "$NAMESPACE" -l "$LABEL_SELECTOR" -o jsonpath="{.items[0].metadata.name}" 2>/dev/null || echo "")
+          echo "CRON_POD_NAME is $CRON_POD_NAME"
+
+          if [ -z "$CRON_POD_NAME" ]; then
+            echo "No active Scheduler pod found, skipping termination."
+            exit 0
+          fi
+
+          echo "Found pod: $CRON_POD_NAME"
+          echo "Sending SIGTERM to pod $CRON_POD_NAME"
+          kubectl delete pod "$CRON_POD_NAME" --grace-period=60 --wait=false -n "$NAMESPACE"
+
+          echo "Waiting for pod $CRON_POD_NAME to terminate..."
+          while true; do
+            STATUS=$(kubectl get pod "$CRON_POD_NAME" -n "$NAMESPACE" --ignore-not-found -o jsonpath='{.status.phase}')
+            if [ -z "$STATUS" ] || [ "$STATUS" = "Succeeded" ] || [ "$STATUS" = "Failed" ]; then
+              echo "Pod $CRON_POD_NAME terminated gracefully."
+              break
+            fi
+            echo "Still terminating... current status: $STATUS"
+            sleep 5
+          done
+
+      - name: Deploy scheduler Helm chart to GKE
+        run: |
+          helm upgrade --install go-scheduler ./chart/${{ env.REPO_NAME }} \
+            --version ${{ github.event.inputs.chart_version }} \
+            --namespace ${{ github.event.inputs.namespace }} \
+            --create-namespace \
+            -f ./chart/${{ env.REPO_NAME }}/values-scheduler.yaml \
+            -f ./chart/${{ env.REPO_NAME }}/values-scheduler-${{ github.event.inputs.environment }}.yaml

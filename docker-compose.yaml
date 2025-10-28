@@ -1,0 +1,120 @@
+services:
+  develop.mysql:
+    image: mysql
+    container_name: develop.mysql
+    restart: always
+    volumes:
+      - ./docker/data/mysql:/var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3306:3306"
+    networks:
+      - docker-network
+    healthcheck:
+      start_period: 10s # Time to initialize
+      test: mysqladmin ping -h develop.mysql -u root --password=$$MYSQL_PASSWORD
+      interval: 10s
+      timeout: 10s
+      retries: 3
+
+  develop.redis:
+    image: redis
+    command: ["redis-server", "--appendonly", "yes"]
+    container_name: develop.redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./docker/data/redis:/data
+    networks:
+      - docker-network
+    healthcheck:
+      start_period: 10s # Time to initialize
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 3
+
+  develop.rabbitmq:
+    image: rabbitmq:3-management
+    container_name: develop.rabbitmq
+    restart: always
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672" # AMQP 协议端口
+      - "15672:15672" # 管理界面端口
+    volumes:
+      - ./docker/data/rabbitmq:/var/lib/rabbitmq
+    networks:
+      - docker-network
+    healthcheck:
+      start_period: 10s # Time to initialize
+      test: rabbitmq-diagnostics check_port_connectivity
+      interval: 10s
+      timeout: 10s
+      retries: 3
+
+  develop.elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.16.3
+    container_name: develop.elasticsearch
+    restart: always
+    environment:
+      - discovery.type=single-node
+      # - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - ELASTIC_PASSWORD=zAU47tPtlh9ZxcsU
+      - xpack.security.enabled=true
+      - xpack.security.transport.ssl.enabled=false
+      - bootstrap.memory_lock=true
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - ./docker/data/elasticsearch:/usr/share/elasticsearch/data
+      - ./docker/elasticsearch-config:/usr/share/elasticsearch/config
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    networks:
+      - docker-network
+    healthcheck:
+      start_period: 30s # Time to initialize
+      test:
+        [
+          "CMD-SHELL",
+          "curl -s http://develop.elasticsearch:9200 >/dev/null || exit 1",
+        ]
+      interval: 10s
+      timeout: 30s
+      retries: 3
+
+  develop.kibana:
+    image: docker.elastic.co/kibana/kibana:8.16.3
+    container_name: develop.kibana
+    restart: always
+    environment:
+      - ELASTICSEARCH_HOSTS=http://develop.elasticsearch:9200
+      - ELASTICSEARCH_PASSWORD=zAU47tPtlh9ZxcsU
+      - XPACK_SECURITY_ENABLED=true
+      - ELASTICSEARCH_SERVICEACCOUNTTOKEN=AAEAAWVsYXN0aWMva2liYW5hL3NlcnZpY2UtdG9rZW4ta2liYW5hOmxlellnWDFEVDVPSkQtTm1HNXNJLXc
+      - ELASTICSEARCH_SSL_NO_LEGACY_PROVIDER=true
+    ports:
+      - "5601:5601"
+    depends_on:
+      develop.elasticsearch:
+        condition: service_healthy
+    networks:
+      - docker-network
+    healthcheck:
+      start_period: 10s # Time to initialize
+      test: ["CMD", "curl", "-f", "http://develop.kibana:5601"] # Basic health check.
+      interval: 10s
+      timeout: 10s
+      retries: 3
+
+networks:
+  docker-network:
+    driver: bridge
