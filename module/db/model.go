@@ -1,6 +1,10 @@
 package db
 
-import "time"
+import (
+	"time"
+
+	"gorm.io/plugin/soft_delete"
+)
 
 type TableTotalRows struct {
 	TotalRows uint64 `gorm:"type:bigint UNSIGNED;column:total_rows" json:"-"`
@@ -13,27 +17,32 @@ type Sorting struct {
 }
 
 type TableTime struct {
-	CreatedAt *time.Time `gorm:"column:created_at;type:datetime;not null;default:CURRENT_TIMESTAMP;comment:新增時間" json:"created_at,omitempty"`
-	UpdatedAt *time.Time `gorm:"column:updated_at;type:datetime;not null;default:CURRENT_TIMESTAMP;comment:修改時間" json:"updated_at,omitempty"`
+	TableCreatedAt
+	TableUpdatedAt
 }
 
 type TableCreatedAt struct {
-	CreatedAt *time.Time `gorm:"column:created_at;type:datetime;not null;default:CURRENT_TIMESTAMP;comment:新增時間" json:"created_at,omitempty"`
+	CreatedAt *time.Time `gorm:"column:created_at;type:datetime;default:CURRENT_TIMESTAMP" json:"created_at,omitempty,omitzero"`
 }
 
 type TableUpdatedAt struct {
-	UpdatedAt *time.Time `gorm:"column:updated_at;type:datetime;not null;default:CURRENT_TIMESTAMP;comment:修改時間" json:"updated_at,omitempty"`
+	UpdatedAt *time.Time `gorm:"column:updated_at;type:datetime;default:CURRENT_TIMESTAMP" json:"updated_at,omitempty,omitzero"`
+}
+
+type TableDeleted struct {
+	DeletedAt *time.Time            `gorm:"column:deleted_at;type:datetime" json:"-"`
+	IsDeleted soft_delete.DeletedAt `gorm:"column:is_deleted;type:int;softDelete:flag,DeletedAtField:DeletedAt" json:"-"`
 }
 
 type TableUser struct {
-	CreatedBy *string `gorm:"column:created_by;type:varchar(50);comment:新增後台帳號" json:"created_by,omitempty"`
-	UpdatedBy *string `gorm:"column:updated_by;type:varchar(50);comment:修改後台帳號" json:"updated_by,omitempty"`
+	TableCreatedBy
+	TableUpdatedBy
 }
 
 type TableCreatedBy struct {
-	CreatedBy *string `gorm:"column:created_by;type:varchar(50);comment:新增後台帳號" json:"created_by,omitempty"`
+	CreatedBy *string `gorm:"column:created_by;type:varchar(50);default:'System'" json:"created_by,omitempty,omitzero"`
 }
 
 type TableUpdatedBy struct {
-	UpdatedBy *string `gorm:"column:updated_by;type:varchar(50);comment:修改後台帳號" json:"updated_by,omitempty"`
+	UpdatedBy *string `gorm:"column:updated_by;type:varchar(50);default:'System'" json:"updated_by,omitempty,omitzero"`
 }
