@@ -16,14 +16,14 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
-	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
 type AWSClient struct {
 	*CloudStorage
 	client   *s3.Client
-	uploader *manager.Uploader
+	uploader *transfermanager.Client
 }
 
 func NewAWSClient(cloudStorage *CloudStorage) (*AWSClient, error) {
@@ -60,7 +60,7 @@ func NewAWSClient(cloudStorage *CloudStorage) (*AWSClient, error) {
 	return &AWSClient{
 		CloudStorage: cloudStorage,
 		client:       client,
-		uploader:     manager.NewUploader(client),
+		uploader:     transfermanager.New(client),
 	}, nil
 }
 
@@ -191,7 +191,7 @@ func (g *AWSClient) UploadFileWeb(ctx context.Context, folderName string, formFi
 	timestamp := time.Now().UnixMicro()
 	objectName := fmt.Sprintf("%s%d_%s", folderName, timestamp, filepath.Base(formFile.Filename))
 
-	_, err = g.uploader.Upload(ctx, &s3.PutObjectInput{
+	_, err = g.uploader.UploadObject(ctx, &transfermanager.UploadObjectInput{
 		Bucket:      aws.String(g.config.AWS_S3_BUCKET_NAME),
 		Key:         aws.String(objectName),
 		Body:        srcFile, // The io.Reader (file stream)
@@ -287,7 +287,7 @@ func (g *AWSClient) UploadMultipleFileWeb(ctx context.Context, folderName string
 			timestamp := time.Now().UnixMicro()
 			objectName := fmt.Sprintf("%s%d_%s", folderPrefix, timestamp, baseFilename)
 
-			_, err = g.uploader.Upload(ctx, &s3.PutObjectInput{
+			_, err = g.uploader.UploadObject(ctx, &transfermanager.UploadObjectInput{
 				Bucket:      aws.String(g.config.AWS_S3_BUCKET_NAME),
 				Key:         aws.String(objectName),
 				Body:        fh, // The io.Reader (file stream)
