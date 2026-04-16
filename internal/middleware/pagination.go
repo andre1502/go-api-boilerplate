@@ -5,11 +5,11 @@ import (
 	"go-api-boilerplate/module/pagination"
 	"strconv"
 
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 func (m *Middleware) Paginate(next echo.HandlerFunc) echo.HandlerFunc {
-	return func(c echo.Context) error {
+	return func(c *echo.Context) error {
 		var page int
 		var pageSize int
 		var err error

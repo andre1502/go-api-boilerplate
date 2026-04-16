@@ -1,6 +1,6 @@
-# 使用 Go 1.25 base image
+# 使用 Go 1.26 base image
 # Stage builder
-FROM golang:1.25-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 ENV CGO_ENABLED=0 \
     GOOS=linux

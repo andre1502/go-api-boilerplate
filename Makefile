@@ -38,3 +38,13 @@ dev: air
 .PHONY: scheduler
 scheduler: air
 	air --build.cmd "make build_scheduler" --build.bin "bin/scheduler"
+
+# run dev
+.PHONY: docker_dev
+docker_dev: air
+	docker compose up -d && air --build.cmd "make build_api" --build.bin "bin/api" && docker compose down
+
+# run scheduler
+.PHONY: docker_scheduler
+docker_scheduler: air
+	docker compose up -d && air --build.cmd "make build_scheduler" --build.bin "bin/scheduler" && docker compose down

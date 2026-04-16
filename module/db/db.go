@@ -85,9 +85,9 @@ func (dbc *DBConnection) GetTotalRecord(result *gorm.DB, countFieldName string) 
 
 	indexFrom := strings.Index(stmtSql, "FROM")
 	indexGroupBy := strings.Index(stmtSql, "GROUP BY")
-	indexOrderBy := strings.Index(stmtSql, "ORDER BY")
-	indexLimit := strings.Index(stmtSql, "LIMIT")
-	indexOffset := strings.Index(stmtSql, "OFFSET")
+	indexOrderBy := strings.LastIndex(stmtSql, "ORDER BY")
+	indexLimit := strings.LastIndex(stmtSql, "LIMIT")
+	indexOffset := strings.LastIndex(stmtSql, "OFFSET")
 
 	if indexLimit > -1 {
 		additionalVars++
@@ -119,8 +119,7 @@ func (dbc *DBConnection) GetTotalRecord(result *gorm.DB, countFieldName string) 
 	output := result.Session(&gorm.Session{}).Raw(sql.String(), stmtVars...).Scan(&rows)
 
 	if output.Error != nil {
-		logger.Log.Errorf("error when get total record: %v", output.Error)
-		return 0, ErrScanTotalRecord
+		return 0, output.Error
 	}
 
 	return rows.TotalRows, nil

@@ -3,11 +3,11 @@ package middleware
 import (
 	"go-api-boilerplate/internal/constant"
 
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 func (m *Middleware) CheckJwtMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
-	return func(c echo.Context) error {
+	return func(c *echo.Context) error {
 		jwtClaims, tkn, err := m.GetJwtClaims(c, constant.USER_JWT)
 		if (err != nil) || (jwtClaims == nil) {
 			return m.Response.Unauthorized(c)

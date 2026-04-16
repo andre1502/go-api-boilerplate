@@ -15,8 +15,8 @@ import (
 	"slices"
 	"time"
 
-	"github.com/labstack/echo/v4"
-	echoMiddleware "github.com/labstack/echo/v4/middleware"
+	"github.com/labstack/echo/v5"
+	echoMiddleware "github.com/labstack/echo/v5/middleware"
 )
 
 type Server struct {
@@ -84,48 +84,43 @@ func (s *Server) monitorBody() {
 		// fmt.Sprintf("/%s", "url_path"),
 	}
 
-	if len(monitorUrls) > 0 {
-		s.Echo.Use(s.pathBodyDumpMiddleware(monitorUrls...))
+	transactionUrls := []string{
+		// fmt.Sprintf("/%s", "url_path"),
 	}
+
+	s.Echo.Use(s.pathBodyDumpMiddleware(monitorUrls, transactionUrls))
 }
 
 // PathBodyDumpMiddleware logs the path and body for specific routes.
-func (s *Server) pathBodyDumpMiddleware(paths ...string) echo.MiddlewareFunc {
-	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
-			// Check if the current request path is in the list of paths to log.
-			logPath := false
-			for _, p := range paths {
-				if c.Path() == p {
-					logPath = true
-					break
-				}
-			}
-
-			// If the path is not one we want to log, just proceed.
-			if !logPath {
-				return next(c)
-			}
-
-			// If the path should be logged, we use the body dump middleware.
-			return echoMiddleware.BodyDump(func(c echo.Context, reqBody, resBody []byte) {
-				transactionUrls := []string{
-					// fmt.Sprintf("/%s", "url_path"),
-				}
-
-				logFields := map[string]interface{}{
-					"request":  reqBody,
-					"response": resBody,
-				}
-
-				if slices.Contains(transactionUrls, c.Path()) {
-					logFields["elastic_index"] = elastic.ELASTIC_TRANSACTION_ACTIVITY_INDEX
-				}
-
-				logger.Log.WithFields(logFields).Info(fmt.Sprintf("Body Dump for URL: %s, Request Body: %s, Response Body: %s.", c.Request().URL, string(reqBody), string(resBody)))
-			})(next)(c)
-		}
+func (s *Server) pathBodyDumpMiddleware(paths, transactionUrls []string) echo.MiddlewareFunc {
+	// Create a set of paths for efficient lookup.
+	pathSet := make(map[string]struct{}, len(paths))
+	for _, p := range paths {
+		pathSet[p] = struct{}{}
 	}
+
+	config := echoMiddleware.BodyDumpConfig{
+		// The Skipper function determines if the middleware should be skipped.
+		// We want to skip it if the request path is NOT in our set of paths to monitor.
+		Skipper: func(c *echo.Context) bool {
+			_, found := pathSet[c.Path()]
+			return !found // Skip if path is not in the set
+		},
+		Handler: func(c *echo.Context, reqBody, resBody []byte, err error) {
+			logFields := map[string]interface{}{
+				"request_body":  string(reqBody),
+				"response_body": string(resBody),
+			}
+
+			if slices.Contains(transactionUrls, c.Path()) {
+				logFields["elastic_index"] = elastic.ELASTIC_TRANSACTION_ACTIVITY_INDEX
+			}
+
+			logger.Log.WithFields(logFields).Info(fmt.Sprintf("Body Dump for URL: %s, Request Body: %s, Response Body: %s.", c.Request().URL, string(reqBody), string(resBody)))
+		},
+	}
+
+	return echoMiddleware.BodyDumpWithConfig(config)
 }
 
 func (s *Server) serverStatus() string {
@@ -140,15 +135,15 @@ func (s *Server) serverStatus() string {
 }
 
 func (s *Server) serverRoute() {
-	s.api.GET("", func(c echo.Context) error {
+	s.api.GET("", func(c *echo.Context) error {
 		return c.String(http.StatusOK, s.config.APP_NAME)
 	})
 
-	s.api.GET("/ok", func(c echo.Context) error {
+	s.api.GET("/ok", func(c *echo.Context) error {
 		return c.String(http.StatusOK, s.config.APP_NAME)
 	})
 
-	s.api.GET("/health", func(c echo.Context) error {
+	s.api.GET("/health", func(c *echo.Context) error {
 		c.Response().Header().Set(module.HEADER_CONTENT_TYPE, module.APPLICATION_JSON)
 
 		return c.JSONPretty(200, map[string]interface{}{
@@ -156,7 +151,7 @@ func (s *Server) serverRoute() {
 		}, "  ")
 	})
 
-	s.api.GET("/info", func(c echo.Context) error {
+	s.api.GET("/info", func(c *echo.Context) error {
 		c.Response().Header().Set(module.HEADER_CONTENT_TYPE, module.APPLICATION_JSON)
 
 		platformHealth := s.platformRoute.GetHealth()

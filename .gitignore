@@ -37,3 +37,5 @@ desktop.ini
 
 # Docker
 docker/data
+
+GeoLite2-Country.mmdb

@@ -7,7 +7,7 @@ import (
 	"go-api-boilerplate/internal/status_code"
 	"go-api-boilerplate/module/token"
 
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 type Handler struct {
@@ -20,7 +20,7 @@ func NewHandler(
 	return &Handler{hdlr}
 }
 
-func (h *Handler) GetCurrentUser(c echo.Context) (*token.CustomClaims, error) {
+func (h *Handler) GetCurrentUser(c *echo.Context) (*token.CustomClaims, error) {
 	ex := exception.Ex.Errors(status_code.UNAUTHORIZED_ERROR_CODE, status_code.UNAUTHORIZED_ERROR_MESSAGE, nil)
 
 	userID, ok := c.Get(constant.BO_USER_ID).(int)

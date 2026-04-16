@@ -3,7 +3,7 @@ package routes
 import (
 	"go-api-boilerplate/api/platform/middleware"
 
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 type Route struct {

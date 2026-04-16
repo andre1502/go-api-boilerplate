@@ -2,6 +2,7 @@ package validation
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"go-api-boilerplate/internal/status_code"
 	"go-api-boilerplate/module"
@@ -10,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/go-playground/validator/v10"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 type Validation struct {
@@ -50,12 +51,7 @@ func (v *Validation) Validate(i interface{}) error {
 	return nil
 }
 
-func (v *Validation) ValidateRequest(c echo.Context, i interface{}) error {
-	binder := echo.DefaultBinder{}
-	if err := binder.BindQueryParams(c, i); err != nil {
-		return err
-	}
-
+func (v *Validation) ValidateRequest(c *echo.Context, i interface{}) error {
 	if err := c.Bind(i); err != nil {
 		return err
 	}
@@ -68,28 +64,33 @@ func (v *Validation) ValidateRequest(c echo.Context, i interface{}) error {
 }
 
 func (v *Validation) FormatValidationErrors(err error) []string {
-	errors := make([]string, 0)
+	var validationErrors validator.ValidationErrors
+	var httpError *echo.HTTPError
+	var jsonUnmarshalErr *json.UnmarshalTypeError
+	var strconvErr *strconv.NumError
 
-	if validationErrors, ok := err.(validator.ValidationErrors); ok {
+	errorList := make([]string, 0)
+
+	if errors.As(err, &validationErrors) {
 		for _, e := range validationErrors {
 			field := e.Field()
 			tag := v.validationTagMap(e.Tag())
 			param := e.Param()
 
-			// validation error message format: <field>:<validation>:<value>
+			// 构建错误消息格式: <field>:<validation>:<value>
 			errorMsg := field + ":" + tag
 			if !module.IsEmptyString(param) {
 				errorMsg += ":" + param
 			}
 
-			errors = append(errors, errorMsg)
+			errorList = append(errorList, errorMsg)
 		}
-	} else if httpError, ok := err.(*echo.HTTPError); ok {
-		if httpError.Internal != nil {
-			if jsonUnmarshalErr, ok := httpError.Internal.(*json.UnmarshalTypeError); ok {
+	} else if errors.As(err, &httpError) {
+		if internalErr := errors.Unwrap(httpError); internalErr != nil {
+			if errors.As(internalErr, &jsonUnmarshalErr) {
 				errMsg := fmt.Sprintf("%s:is_%s", jsonUnmarshalErr.Field, jsonUnmarshalErr.Type)
-				errors = append(errors, errMsg)
-			} else if strconvErr, ok := httpError.Internal.(*strconv.NumError); ok {
+				errorList = append(errorList, errMsg)
+			} else if errors.As(internalErr, &strconvErr) {
 				errMsg := strconvErr.Num
 
 				switch strconvErr.Func {
@@ -105,18 +106,18 @@ func (v *Validation) FormatValidationErrors(err error) []string {
 					errMsg = strconvErr.Error()
 				}
 
-				errors = append(errors, errMsg)
+				errorList = append(errorList, errMsg)
 			} else {
-				errors = append(errors, httpError.Internal.Error())
+				errorList = append(errorList, internalErr.Error())
 			}
 		} else {
-			errors = append(errors, httpError.Error())
+			errorList = append(errorList, httpError.Error())
 		}
 	} else {
-		errors = append(errors, status_code.UNKNOWN_ERROR_MESSAGE)
+		errorList = append(errorList, status_code.UNKNOWN_ERROR_MESSAGE)
 	}
 
-	return errors
+	return errorList
 }
 
 func (v *Validation) validationTagMap(tag string) string {

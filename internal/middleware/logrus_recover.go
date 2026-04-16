@@ -5,14 +5,14 @@ import (
 	"net/http"
 	"runtime/debug"
 
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 	"github.com/sirupsen/logrus"
 )
 
 // CustomRecover is a custom Echo middleware for panic recovery with Logrus logging.
 func (m *Middleware) CustomRecover(logger *logrus.Logger) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
+		return func(c *echo.Context) error {
 			defer func() {
 				if r := recover(); r != nil {
 					err, ok := r.(error)
@@ -32,10 +32,10 @@ func (m *Middleware) CustomRecover(logger *logrus.Logger) echo.MiddlewareFunc {
 					}).Error("Panic recovered")
 
 					// Return an internal server error to the client
-					if c.Response().Committed {
+					if c.Response().(*echo.Response).Committed {
 						return
 					}
-					c.Error(echo.NewHTTPError(http.StatusInternalServerError, "Internal Server Error"))
+					c.Echo().HTTPErrorHandler(c, echo.NewHTTPError(http.StatusInternalServerError, "Internal Server Error"))
 				}
 			}()
 			return next(c)

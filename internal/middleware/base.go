@@ -9,7 +9,7 @@ import (
 	"go-api-boilerplate/module/token"
 	"strings"
 
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 type Middleware struct {
@@ -30,7 +30,7 @@ func NewMiddleware(
 	}
 }
 
-func (m *Middleware) ExtractToken(c echo.Context) string {
+func (m *Middleware) ExtractToken(c *echo.Context) string {
 	token := c.QueryParam("token")
 	if !module.IsEmptyString(token) {
 		return token
@@ -46,7 +46,7 @@ func (m *Middleware) ExtractToken(c echo.Context) string {
 	return ""
 }
 
-func (m *Middleware) GetJwtClaims(c echo.Context, jwtRedisKey string) (jwtClaims *token.JwtMapClaims, tkn string, err error) {
+func (m *Middleware) GetJwtClaims(c *echo.Context, jwtRedisKey string) (jwtClaims *token.JwtMapClaims, tkn string, err error) {
 	requestTkn := m.ExtractToken(c)
 
 	if module.IsEmptyString(requestTkn) {

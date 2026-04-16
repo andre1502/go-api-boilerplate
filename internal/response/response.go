@@ -9,7 +9,7 @@ import (
 	"go-api-boilerplate/module/pagination"
 	"net/http"
 
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 type Response struct {
@@ -34,7 +34,7 @@ func NewResponse(pgn *pagination.Pagination) *Response {
 	}
 }
 
-func (r *Response) json(c echo.Context, httpStatus int, data any, err error) error {
+func (r *Response) json(c *echo.Context, httpStatus int, data any, err error) error {
 	requestUri := c.Request().RequestURI
 	r.HttpStatus = httpStatus
 	r.Data = nil
@@ -79,15 +79,15 @@ func (r *Response) json(c echo.Context, httpStatus int, data any, err error) err
 	return c.JSONPretty(r.HttpStatus, r, "  ")
 }
 
-func (r *Response) Success(c echo.Context, data any) error {
+func (r *Response) Success(c *echo.Context, data any) error {
 	return r.json(c, http.StatusOK, data, nil)
 }
 
-func (r *Response) Failed(c echo.Context, err error) error {
+func (r *Response) Failed(c *echo.Context, err error) error {
 	return r.json(c, http.StatusOK, nil, err)
 }
 
-func (r *Response) ValidationFailed(c echo.Context, err *exception.Exception) error {
+func (r *Response) ValidationFailed(c *echo.Context, err *exception.Exception) error {
 	var validationErrors []string
 	if len(err.Args) > 0 {
 		if errors, ok := err.Args[0].([]string); ok {
@@ -103,14 +103,14 @@ func (r *Response) ValidationFailed(c echo.Context, err *exception.Exception) er
 	return c.JSONPretty(http.StatusBadRequest, r, "  ")
 }
 
-func (r *Response) Unauthorized(c echo.Context) error {
+func (r *Response) Unauthorized(c *echo.Context) error {
 	return c.NoContent(http.StatusUnauthorized)
 }
 
-func (r *Response) NotFound(c echo.Context) error {
+func (r *Response) NotFound(c *echo.Context) error {
 	return c.NoContent(http.StatusNotFound)
 }
 
-func (r *Response) ErrorHandler(c echo.Context, httpStatus int, err error) error {
+func (r *Response) ErrorHandler(c *echo.Context, httpStatus int, err error) error {
 	return r.json(c, httpStatus, nil, err)
 }
