@@ -15,6 +15,7 @@ type Setting struct {
 }
 
 type LogEntry struct {
+	InstanceID string                  `json:"instance_id"`
 	Hostname   string                  `json:"host_name"`
 	HostIP     string                  `json:"host_ip"`
 	PodID      string                  `json:"pod_id"`

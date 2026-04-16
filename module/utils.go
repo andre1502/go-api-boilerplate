@@ -2,14 +2,21 @@ package module
 
 import (
 	"encoding/json"
+	"fmt"
 	"html"
 	"math"
 	"net/http"
 	"reflect"
 	"regexp"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/btcsuite/btcd/btcutil/base58"
+	"github.com/btcsuite/btcd/btcutil/bech32"
+	"github.com/labstack/echo/v5"
+	"golang.org/x/exp/constraints"
 )
 
 func IsNilOrEmptyString(value *string) bool {
@@ -32,6 +39,10 @@ func CleanInternalString(value string) string {
 	words := strings.Fields(value)
 
 	return strings.Join(words, " ")
+}
+
+func CleanFilterString(value string) string {
+	return strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(value, ":", "_"), "{", "("), "}", ")")
 }
 
 func DataString(data interface{}) string {
@@ -89,17 +100,19 @@ func IsArray(v interface{}) bool {
 }
 
 func GetClientIP(r *http.Request) string {
-	ip := r.Header.Get("X-Forwarded-For")
-	if ip != "" {
-		return strings.Split(ip, ",")[0]
+	if ip := r.Header.Get(echo.HeaderXForwardedFor); !IsEmptyString(ip) {
+		return strings.TrimSpace(strings.Split(ip, ",")[0])
 	}
 
-	ip = r.Header.Get("X-Real-IP")
-	if ip != "" {
+	if ip := r.Header.Get(echo.HeaderXRealIP); !IsEmptyString(ip) {
 		return ip
 	}
 
-	return r.RemoteAddr
+	if ip := r.Header.Get("CF-Connecting-IP"); !IsEmptyString(ip) {
+		return ip
+	}
+
+	return strings.TrimSpace(r.RemoteAddr)
 }
 
 func RoundUp(value float64, decimalPlaces int) float64 {
@@ -116,6 +129,14 @@ func Round(value float64, decimalPlaces int) float64 {
 	rounded := math.Round(scaled)
 
 	return rounded / factor
+}
+
+func RoundDown(value float64, decimalPlaces int) float64 {
+	factor := math.Pow10(decimalPlaces)
+	scaled := value * factor
+	floor := math.Floor(scaled)
+
+	return floor / factor
 }
 
 // SliceToMap converts a slice of any type to a map.
@@ -172,6 +193,54 @@ func FuncName() string {
 	return runtimeFunc.ReplaceAllString(funcObj.Name(), "$1")
 }
 
+// The Ordered constraint is defined in golang.org/x/exp/constraints
+// and includes all basic types that support the <, >, <=, >= operators:
+// Ordered = Integer | Float | ~string
+type Ordered = constraints.Ordered
+
+// Define the generic function with the new Ordered constraint.
+func GetMinNItems[T any, C Ordered](items []T, n int, accessor func(T) C) []T {
+	// Check if the input is empty or N is zero
+	if len(items) == 0 || n <= 0 {
+		return nil
+	}
+
+	// Create a copy of the slice to avoid modifying the original
+	itemsCopy := make([]T, len(items))
+	copy(itemsCopy, items)
+
+	// Custom sort the slice based on the value returned by the accessor function
+	// The comparison requires the type C to support the '<' operator.
+	// This relies on Go's internal handling of comparable types.
+	// Note: For non-numeric comparable types like strings, '<' performs lexicographical comparison.
+	sort.Slice(itemsCopy, func(i, j int) bool {
+		valI := accessor(itemsCopy[i])
+		valJ := accessor(itemsCopy[j])
+		return valI < valJ // Ascending sort (minimum first)
+	})
+
+	// Return the first N elements
+	if len(itemsCopy) < n {
+		return itemsCopy
+	}
+
+	return itemsCopy[:n]
+}
+
+func GetUrl(domain string, path string) string {
+	if strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://") {
+		return path
+	}
+
+	path = strings.TrimPrefix(path, "/")
+
+	if strings.HasPrefix(domain, "http://") || strings.HasPrefix(domain, "https://") {
+		return fmt.Sprintf("%s/%s", domain, path)
+	}
+
+	return fmt.Sprintf("https://%s/%s", domain, path)
+}
+
 func MappingData(datas map[string]interface{}, key string, data any) map[string]interface{} {
 	if datas == nil {
 		datas = make(map[string]interface{})
@@ -180,6 +249,69 @@ func MappingData(datas map[string]interface{}, key string, data any) map[string]
 	datas[key] = data
 
 	return datas
+}
+
+func MaskingString(input string, firstVisible int, lastVisible int) string {
+	inputLen := len(input)
+	if inputLen == 0 {
+		return ""
+	}
+
+	const minMaskLen = 2
+
+	// Pattern: Only Last X Visible (firstVisible = 0)
+	if firstVisible <= 0 {
+		mLen := max(minMaskLen, inputLen-lastVisible)
+		mLen = min(mLen, inputLen)
+		return strings.Repeat("*", mLen) + input[mLen:]
+	}
+
+	// Pattern: Middle Masking (First and Last visible)
+	f, l := firstVisible, lastVisible
+
+	if inputLen < (f + l + minMaskLen) {
+		allowedEdges := max(0, inputLen-minMaskLen)
+		totalRequested := float64(f + l)
+
+		if totalRequested > 0 {
+			f = int(float64(f) / totalRequested * float64(allowedEdges))
+			l = allowedEdges - f
+		} else {
+			f, l = 0, 0
+		}
+	}
+
+	middleLen := inputLen - f - l
+	return input[:f] + strings.Repeat("*", middleLen) + input[inputLen-l:]
+}
+
+func IsValidCryptoAddress(address string) bool {
+	// 1. Check EVM (Ethereum/BSC/Polygon)
+	// Pattern: 0x + 40 hex chars
+	if regexp.MustCompile("^0x[0-9a-fA-F]{40}$").MatchString(address) {
+		return true
+	}
+
+	// 2. Check Base58Check (Legacy BTC, Doge, Tron)
+	// This decodes AND verifies the 4-byte double-SHA256 checksum
+	_, _, err := base58.CheckDecode(address)
+	if err == nil {
+		return true
+	}
+
+	// 3. Check Bech32/Bech32m (SegWit BTC, Cosmos, Polkadot)
+	_, _, err = bech32.Decode(address)
+	if err == nil {
+		return true
+	}
+
+	// 4. Check Solana (Base58 Raw)
+	// Solana doesn't use a checksum, only a length check (32-44 chars)
+	if regexp.MustCompile("^[1-9A-HJ-NP-Za-km-z]{32,44}$").MatchString(address) {
+		return true
+	}
+
+	return false
 }
 
 func IsHaveBadWords(value string) bool {

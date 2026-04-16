@@ -9,18 +9,20 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var Log *logrus.Logger
+var Log *logrus.Entry
 
-func NewLogger(fileName string) *logrus.Logger {
-	Log = logrus.New()
+func NewLogger(instanceID, hostname, hostIP, podID, podName, podIP, repoName, branchName, commitHash, buildDate, version, appName, fileName string) *logrus.Entry {
+	logFields := GetDefaultLogFields(instanceID, hostname, hostIP, podID, podName, podIP, repoName, branchName, commitHash, buildDate, version, appName)
+
+	log := logrus.New()
 
 	// 设置日志格式
-	Log.SetFormatter(&logrus.JSONFormatter{})
+	log.SetFormatter(&logrus.JSONFormatter{})
 
 	// 设置日志级别
-	Log.SetLevel(logrus.InfoLevel)
+	log.SetLevel(logrus.InfoLevel)
 
-	Log.SetReportCaller(true)
+	log.SetReportCaller(true)
 
 	// 创建日志文件目录，如果不存在
 	logDir := "logs"
@@ -37,40 +39,28 @@ func NewLogger(fileName string) *logrus.Logger {
 	}
 
 	// 设置日志输出到文件
-	Log.SetOutput(logFile)
+	log.SetOutput(logFile)
+
+	Log = log.WithFields(logFields)
 
 	return Log
 }
 
-func GetLogFields(method, requestUri, requestId string, ipAddress string, err error, httpStatus int, code int, message string) logrus.Fields {
-	return map[string]interface{}{
-		"method":     method,
-		"uri":        requestUri,
-		"requestId":  requestId,
-		"ip_address": ipAddress,
-		"error":      err,
-		"httpStatus": httpStatus,
-		"code":       code,
-		"message":    message,
-	}
-}
-
-func GetElasticLogFields(hostname, hostIP, podID, podName, podIP, repoName, branchName, commitHash, buildDate, version, appName string, timestamp time.Time,
-	message string, data *map[string]interface{}) logrus.Fields {
-
+func GetDefaultLogFields(instanceID, hostname, hostIP, podID, podName, podIP, repoName, branchName, commitHash, buildDate, version, appName string) logrus.Fields {
 	logFields := map[string]interface{}{
-		"host_name":    hostname,
-		"host_ip":      hostIP,
-		"repo_name":    repoName,
-		"branch_name":  branchName,
-		"commit_hash":  commitHash,
-		"build_date":   buildDate,
-		"version":      version,
-		"app_name":     appName,
-		"timestamp":    timestamp,
-		"message":      message,
-		"from_elastic": true,
-		"data":         data,
+		"host_name":   hostname,
+		"host_ip":     hostIP,
+		"repo_name":   repoName,
+		"branch_name": branchName,
+		"commit_hash": commitHash,
+		"build_date":  buildDate,
+		"version":     version,
+		"app_name":    appName,
+		"timestamp":   time.Now(),
+	}
+
+	if !module.IsEmptyString(instanceID) {
+		logFields["instance_id"] = instanceID
 	}
 
 	if !module.IsEmptyString(podID) {
@@ -84,6 +74,34 @@ func GetElasticLogFields(hostname, hostIP, podID, podName, podIP, repoName, bran
 	if !module.IsEmptyString(podIP) {
 		logFields["pod_ip"] = podIP
 	}
+
+	return logFields
+}
+
+func GetResponseLogFields(logIndex, method, requestUri, requestId string, ipAddress string, err error, httpStatus int, code int, message string, data any) logrus.Fields {
+	return map[string]interface{}{
+		"elastic_index": logIndex,
+		"timestamp":     time.Now(),
+		"method":        method,
+		"uri":           requestUri,
+		"requestId":     requestId,
+		"ip_address":    ipAddress,
+		"error":         err,
+		"httpStatus":    httpStatus,
+		"code":          code,
+		"msg":           message,
+		"data":          data,
+	}
+}
+
+func GetElasticLogFields(instanceID, hostname, hostIP, podID, podName, podIP, repoName, branchName, commitHash, buildDate, version, appName string, timestamp time.Time,
+	message string, data *map[string]interface{}) logrus.Fields {
+
+	logFields := GetDefaultLogFields(instanceID, hostname, hostIP, podID, podName, podIP, repoName, branchName, commitHash, buildDate, version, appName)
+	logFields["timestamp"] = timestamp
+	logFields["msg"] = message
+	logFields["from_elastic"] = true
+	logFields["data"] = data
 
 	return logFields
 }

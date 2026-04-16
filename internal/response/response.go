@@ -46,13 +46,17 @@ func (r *Response) json(c *echo.Context, httpStatus int, data any, err error) er
 			r.Message = he.Error()
 			r.Err = he.Err
 		} else {
+			r.Code = status_code.UNKNOWN_ERROR_CODE
+			r.Message = exception.Ex.GetErrorMessage(r.Code, status_code.UNKNOWN_ERROR_MESSAGE, err)
 			r.Err = err
 		}
 
-		logData := logger.GetLogFields(c.Request().Method, requestUri, c.Response().Header().Get(echo.HeaderXRequestID), module.GetClientIP(c.Request()),
-			r.Err, r.HttpStatus, r.Code, r.Message)
+		r.Data = data
 
-		logData["elastic_index"] = internal.GetLogIndex(requestUri)
+		logIndex := internal.GetLogIndex(requestUri)
+		logData := logger.GetResponseLogFields(logIndex, c.Request().Method, requestUri, c.Response().Header().Get(echo.HeaderXRequestID), module.GetClientIP(c.Request()),
+			r.Err, r.HttpStatus, r.Code, r.Message, r.Data)
+
 		logger.Log.WithFields(logData).Error(err)
 
 		return c.JSONPretty(r.HttpStatus, r, "  ")

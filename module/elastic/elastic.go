@@ -33,6 +33,14 @@ type ElasticConnection struct {
 }
 
 func NewElasticConnection(cfg *config.Config) (ElasticConnections, error) {
+	if module.IsEmptyString(cfg.ELASTIC_URL) {
+		msg := "Elastic URL is empty, skipping elastic connection"
+		fmt.Println(msg)
+		logger.Log.Warn(msg)
+
+		return nil, nil
+	}
+
 	ctx := context.Background()
 	elasticConfig := elasticsearch.Config{
 		Addresses: []string{
@@ -76,7 +84,7 @@ func NewElasticConnection(cfg *config.Config) (ElasticConnections, error) {
 		return nil, err
 	}
 
-	logger.Log.AddHook(elasticLogger)
+	logger.Log.Logger.AddHook(elasticLogger)
 
 	return es, nil
 }
@@ -141,6 +149,7 @@ func (ec *ElasticConnection) IsIndexBlocked(indexName string) (*Setting, error) 
 
 func (ec *ElasticConnection) LogToIndex(indexName, message string, data map[string]interface{}) error {
 	logEntry := LogEntry{
+		InstanceID: ec.config.INSTANCE_ID,
 		Hostname:   ec.config.HOST_NAME,
 		HostIP:     ec.config.HOST_IP,
 		PodID:      ec.config.POD_ID,
@@ -180,7 +189,7 @@ func (ec *ElasticConnection) LogToIndex(indexName, message string, data map[stri
 
 	defer func() {
 		if r := recover(); r != nil {
-			logger.Log.WithFields(logger.GetElasticLogFields(logEntry.Hostname, logEntry.HostIP, logEntry.PodID, logEntry.PodName, logEntry.PodIP, logEntry.RepoName,
+			logger.Log.WithFields(logger.GetElasticLogFields(logEntry.InstanceID, logEntry.Hostname, logEntry.HostIP, logEntry.PodID, logEntry.PodName, logEntry.PodIP, logEntry.RepoName,
 				logEntry.BranchName, logEntry.CommitHash, logEntry.BuildDate, logEntry.Version, logEntry.AppName, logEntry.Timestamp, logEntry.Message, logEntry.Data)).
 				Error("Panic in LogToIndex: ", r)
 		}
@@ -188,7 +197,7 @@ func (ec *ElasticConnection) LogToIndex(indexName, message string, data map[stri
 
 	setting, err := ec.IsIndexBlocked(indexName)
 	if err != nil {
-		logger.Log.WithFields(logger.GetElasticLogFields(logEntry.Hostname, logEntry.HostIP, logEntry.PodID, logEntry.PodName, logEntry.PodIP, logEntry.RepoName,
+		logger.Log.WithFields(logger.GetElasticLogFields(logEntry.InstanceID, logEntry.Hostname, logEntry.HostIP, logEntry.PodID, logEntry.PodName, logEntry.PodIP, logEntry.RepoName,
 			logEntry.BranchName, logEntry.CommitHash, logEntry.BuildDate, logEntry.Version, logEntry.AppName, logEntry.Timestamp, logEntry.Message, logEntry.Data)).
 			Error(err)
 
@@ -196,7 +205,7 @@ func (ec *ElasticConnection) LogToIndex(indexName, message string, data map[stri
 	}
 
 	if setting.IndexBlocksWrite != nil && *setting.IndexBlocksWrite {
-		logger.Log.WithFields(logger.GetElasticLogFields(logEntry.Hostname, logEntry.HostIP, logEntry.PodID, logEntry.PodName, logEntry.PodIP, logEntry.RepoName,
+		logger.Log.WithFields(logger.GetElasticLogFields(logEntry.InstanceID, logEntry.Hostname, logEntry.HostIP, logEntry.PodID, logEntry.PodName, logEntry.PodIP, logEntry.RepoName,
 			logEntry.BranchName, logEntry.CommitHash, logEntry.BuildDate, logEntry.Version, logEntry.AppName, logEntry.Timestamp, logEntry.Message, logEntry.Data)).
 			Warn("Index write blocked")
 
@@ -207,7 +216,7 @@ func (ec *ElasticConnection) LogToIndex(indexName, message string, data map[stri
 		Header("Accept", module.APPLICATION_JSON).Request(logEntry).Do(ec.ctx)
 
 	if err != nil {
-		logger.Log.WithFields(logger.GetElasticLogFields(logEntry.Hostname, logEntry.HostIP, logEntry.PodID, logEntry.PodName, logEntry.PodIP, logEntry.RepoName,
+		logger.Log.WithFields(logger.GetElasticLogFields(logEntry.InstanceID, logEntry.Hostname, logEntry.HostIP, logEntry.PodID, logEntry.PodName, logEntry.PodIP, logEntry.RepoName,
 			logEntry.BranchName, logEntry.CommitHash, logEntry.BuildDate, logEntry.Version, logEntry.AppName, logEntry.Timestamp, logEntry.Message, logEntry.Data)).
 			Error("Failed to log to Elasticsearch: ", err)
 

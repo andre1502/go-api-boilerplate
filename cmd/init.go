@@ -40,7 +40,8 @@ func MainInit(repoName, branchName, commitHash, buildDate, version string, isShu
 		return cfg
 	})
 
-	logger.NewLogger(strings.ToLower(cfg.APP_NAME))
+	logger.NewLogger(cfg.INSTANCE_ID, cfg.HOST_NAME, cfg.HOST_IP, cfg.POD_ID, cfg.POD_NAME, cfg.POD_IP, cfg.REPO_NAME, cfg.BRANCH_NAME,
+		cfg.COMMIT_HASH, cfg.BUILD_DATE, cfg.VERSION, cfg.APP_NAME, strings.ToLower(cfg.APP_NAME))
 
 	es, err := elastic.NewElasticConnection(cfg)
 	if err != nil {

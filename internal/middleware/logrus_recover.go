@@ -10,7 +10,7 @@ import (
 )
 
 // CustomRecover is a custom Echo middleware for panic recovery with Logrus logging.
-func (m *Middleware) CustomRecover(logger *logrus.Logger) echo.MiddlewareFunc {
+func (m *Middleware) CustomRecover(logger *logrus.Entry) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c *echo.Context) error {
 			defer func() {

@@ -9,38 +9,45 @@ import (
 )
 
 type Config struct {
-	START_TIME                      time.Time
-	IS_SHUTTING_DOWN                *int32
-	HOST_NAME                       string
-	HOST_IP                         string
-	POD_ID                          string
-	POD_NAME                        string
-	POD_IP                          string
-	REPO_NAME                       string
-	BRANCH_NAME                     string
-	COMMIT_HASH                     string
-	BUILD_DATE                      string
-	VERSION                         string
-	APP_NAME                        string
-	SERVER_URL                      string
-	SERVER_ADDRESS                  string
-	SCHEDULER_HEALTH_SERVER_ADDRESS string
-	DB                              *DbConfig
-	REDIS                           *RedisConfig
-	JWT_SECRET_KEY                  string
-	PLATFORM_JWT_EXPIRE_MINUTES     string
-	BACKOFFICE_JWT_EXPIRE_MINUTES   string
-	ACCOUNT_ID_LENGTH               string
-	ELASTIC_URL                     string
-	ELASTIC_USERNAME                string
-	ELASTIC_PASSWORD                string
-	KAIA_ENDPOINT                   string
-	KAIA_SENDER_PRIVATE_KEY         string
-	KAIA_TEST_MODE                  string
-	SCHEDULE_REDIS_PREFIX           string
-	MAX_FILE_SIZE_MB                string
-	MAX_FILE_COUNT                  string
-	GCP_CLOUD_STORAGE_BUCKET_NAME   string
+	START_TIME                           time.Time
+	IS_SHUTTING_DOWN                     *int32
+	INSTANCE_ID                          string
+	HOST_NAME                            string
+	HOST_IP                              string
+	POD_ID                               string
+	POD_NAME                             string
+	POD_IP                               string
+	REPO_NAME                            string
+	BRANCH_NAME                          string
+	COMMIT_HASH                          string
+	BUILD_DATE                           string
+	VERSION                              string
+	APP_NAME                             string
+	SERVER_URL                           string
+	SERVER_ADDRESS                       string
+	SCHEDULER_HEALTH_SERVER_ADDRESS      string
+	PROMETHEUS_METRIC_API_SERVER_ADDRESS string
+	DB                                   *DbConfig
+	REDIS                                *RedisConfig
+	JWT_SECRET_KEY                       string
+	PLATFORM_JWT_EXPIRE_MINUTES          string
+	BACKOFFICE_JWT_EXPIRE_MINUTES        string
+	ACCOUNT_ID_LENGTH                    string
+	ELASTIC_URL                          string
+	ELASTIC_USERNAME                     string
+	ELASTIC_PASSWORD                     string
+	KAIA_ENDPOINT                        string
+	KAIA_SENDER_PRIVATE_KEY              string
+	KAIA_TEST_MODE                       string
+	SCHEDULE_REDIS_PREFIX                string
+	MAX_FILE_SIZE_MB                     string
+	MAX_FILE_COUNT                       string
+	GCP_CLOUD_STORAGE_BUCKET_NAME        string
+	AWS_S3_BUCKET_NAME                   string
+	AWS_ACCESS_KEY_ID                    string
+	AWS_SECRET_ACCESS_KEY                string
+	AWS_REGION                           string
+	MAX_MIND_DATABASE                    string
 }
 
 type DbConfig struct {

@@ -7,11 +7,12 @@ import (
 	"go-api-boilerplate/cmd/api/server"
 	"go-api-boilerplate/module/config"
 	"go-api-boilerplate/module/logger"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/labstack/echo/v5"
 )
 
 var (
@@ -35,29 +36,31 @@ func main() {
 		fmt.Println("logger initialized")
 		logger.Log.Info("logger initialized")
 
-		fmt.Println("start Server...")
-		logger.Log.Info("start Server...")
-
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer stop()
 
 		go func() {
-			if err := server.Echo.Start(cfg.SERVER_ADDRESS); err != http.ErrServerClosed {
-				fmt.Printf("start Server error %v\n", err)
-				logger.Log.Errorf("start Server error %v\n", err)
+			fmt.Println("start Server...")
+			logger.Log.Info("start Server...")
+
+			sc := echo.StartConfig{
+				Address:    cfg.SERVER_ADDRESS,
+				HideBanner: true,
+				// HidePort:        true,
+				GracefulTimeout: 60 * time.Second,
+				OnShutdownError: func(err error) {
+					fmt.Printf("shutdown Server error %v\n", err)
+					logger.Log.Errorf("shutdown Server error %v\n", err)
+				},
+			}
+
+			if err := sc.Start(ctx, server.Echo); err != nil {
+				fmt.Printf("Start Server error %v\n", err)
+				logger.Log.Errorf("Start Server error %v\n", err)
 			}
 		}()
 
 		<-ctx.Done()
-
-		// Wait for interrupt signal to gracefully shutdown the server with a timeout of 60 seconds.
-		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-		defer cancel()
-
-		if err := server.Echo.Shutdown(ctx); err != nil {
-			fmt.Printf("shutdown Server error %v\n", err)
-			logger.Log.Errorf("shutdown Server error %v\n", err)
-		}
 
 		fmt.Println("server exiting.")
 		logger.Log.Info("server exiting.")

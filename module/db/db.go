@@ -11,7 +11,6 @@ import (
 	"time"
 
 	gormLoggerLogrus "github.com/nekomeowww/gorm-logger-logrus"
-	"github.com/sirupsen/logrus"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	gormLogger "gorm.io/gorm/logger"
@@ -34,7 +33,7 @@ func NewDB(cfg *config.Config) (*DBConnection, error) {
 	var err error
 
 	gormLog := gormLoggerLogrus.New(gormLoggerLogrus.Options{
-		Logger:                    logrus.NewEntry(logger.Log).WithField("elastic_index", elastic.ELASTIC_GORM_LOG_INDEX),
+		Logger:                    logger.Log.WithField("elastic_index", elastic.ELASTIC_GORM_LOG_INDEX),
 		LogLevel:                  gormLogger.Info,
 		IgnoreRecordNotFoundError: false,
 		SlowThreshold:             time.Second * 5,
